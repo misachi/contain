@@ -50,3 +50,9 @@ modules.order
 Module.symvers
 Mkfile.old
 dkms.conf
+
+# local specific
+initial.c
+
+# Visual Studio Code
+.vscode/

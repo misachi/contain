@@ -1,16 +1,16 @@
 #include <sys/wait.h>
 #include <stdlib.h>
-#include <unistd.h>
 #include <stdio.h>
-#include <sys/syscall.h>
-#include <sys/utsname.h>
 
 #include "namespace.h"
 
+#define errExit(msg)    do { perror(msg); exit(EXIT_FAILURE); \
+                               } while (0)
+
 
 void wait_parent(int wstatus, pid_t child_pid) {
-    pid_t w = waitpid(child_pid, &wstatus, WUNTRACED | WCONTINUED);
-    if (w == -1) {
+    pid_t w;
+    if ((w = waitpid(child_pid, &wstatus, WUNTRACED | WCONTINUED)) == -1) {
         perror("waitpid\n");
         exit(EXIT_FAILURE);
     }
@@ -26,61 +26,66 @@ void wait_parent(int wstatus, pid_t child_pid) {
     }
 }
 
-struct child_config
-{
-  int argc;
-  char **argv;
-};
-
-
-static char child_stack[1048576];
-
-// user namespace
-static void user_namespace();
-
 // mounts
-static void mount();
+static void mount2();
 
 // pivot root
 
 // network
 
+// Capabilities
+
+// syscalls(seccomp)
+
+// apparmor
+
 static int child_fn(void *args) {
-    struct child_config *config = args;
-    system("hostname raggamuffin");
+    char ch;
+    struct child_config *config = (struct child_config *) args;
+    // sethostname("misachid", 9);
+    close(config->fd[1]);
+
+    if (read(config->fd[0], &ch, 1) != 0) {
+        fprintf(stderr, "==> Read piped descriptor failed: %m\n");
+        exit(EXIT_FAILURE);
+    }
+
+    close(config->fd[0]);
+
     if (execvp(config->argv[0], config->argv))
-      fprintf(stderr, "execvp failed: %m\n");
+      fprintf(stderr, "==> execvp failed: %m\n");
       return -1;
     return 0;
 }
 
 int main(int argc, char *argv[]){
-    if (argc < 2)
-        goto arg_cnt_err;
     pid_t child_pid;
-    struct child_config config = {argc, &argv[1]};  // remove first argument(file to execute)
-    int wstatus;
-    int ns_types = CLONE_NEWNS
-      | CLONE_NEWCGROUP
-      | CLONE_NEWUTS
-      | CLONE_NEWIPC
-      | CLONE_NEWNET
-      | CLONE_NEWPID;
+    struct child_config config = {
+        .argc = argc,
+        .argv = &argv[1]
+    };  // remove first argument(file to execute)
 
+    int wstatus;
+    int ns_types = CLONE_NEWUSER
+        | CLONE_NEWNS
+        | CLONE_NEWCGROUP
+        | CLONE_NEWUTS
+        | CLONE_NEWIPC
+        | CLONE_NEWNET
+        | CLONE_NEWPID;
+
+    if (pipe(config.fd) == -1)
+        errExit("pipe");
     if ((child_pid = clone(child_fn, child_stack+1048576, ns_types | SIGCHLD, &config)) == -1) {
       fprintf(stderr, "=> clone failed! %m\n");
       exit(EXIT_FAILURE);
     }
     printf("clone() = %ld\n", (long)child_pid);
 
-    goto w_parent;
+    user_namespace(child_pid);
+    close(config.fd[1]);
 
-arg_cnt_err:
-    fprintf(stderr, "=> Too few arguments. No executable provided. Exiting...\n");
-    exit(EXIT_FAILURE);
-
-w_parent:
     wait_parent(wstatus, child_pid);
 
-    return 0;
+    exit(EXIT_SUCCESS);
 }

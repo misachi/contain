@@ -4,7 +4,7 @@
  *
  * Compat code so unshare and setns can be used with older libcs
  */
-#define CAP_AUDIT_READ		37
+
 #ifndef UTIL_LINUX_NAMESPACE_H
 # define UTIL_LINUX_NAMESPACE_H
 
@@ -31,5 +31,21 @@
 # ifndef CLONE_NEWPID
 #  define CLONE_NEWPID 0x20000000
 # endif
+
+# ifndef CAP_AUDIT_READ
+#   define CAP_AUDIT_READ 37
+# endif
+
+# ifndef FILE_SIZE
+#   define FILE_SIZE 100
+# endif
+
+static char child_stack[1048576];
+struct child_config
+{
+  int argc;
+  char **argv;
+  int fd[2];
+};
 
 #endif	/* UTIL_LINUX_NAMESPACE_H */

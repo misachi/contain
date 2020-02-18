@@ -2,8 +2,12 @@
 #include <stdio.h>
 #include <limits.h>
 #include <errno.h>
+#include <unistd.h>
+#include <sys/types.h>
+#include <linux/limits.h>
 
 #include "namespace.h"
+#include "util.h"
 
 
 static void handle_map(char *f_name, char *mapping) {
@@ -12,12 +16,11 @@ static void handle_map(char *f_name, char *mapping) {
     file_write(&fd, mapping);
     close(fd);
 }
-
+// Steve Carell
 // user namespace
 void user_namespace(pid_t _pid) {
     uid_t _uid = getuid();
     gid_t _gid = getgid();
-    int fd;
     char f_name[FILE_SIZE];
     char mapping[FILE_SIZE];
 

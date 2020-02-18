@@ -1,4 +1,8 @@
+all: build run clean
+
 build:
-	gcc util.c user_ns.c container.c -o contain.out
+	gcc -std=c99 util.c user_ns.c container.c mounts.c -o contain.out
 run:
-	./contain.out bash
+	./contain.out /bin/ash
+clean:
+	rm -f contain.out

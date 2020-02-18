@@ -1,12 +1,16 @@
+#define _GNU_SOURCE 
 #include <sys/wait.h>
 #include <stdlib.h>
 #include <stdio.h>
+#include <unistd.h>
+#include <string.h>
+#include <sys/mount.h>
 
 #include "namespace.h"
+#include "util.h"
 
-#define errExit(msg)    do { perror(msg); exit(EXIT_FAILURE); \
-                               } while (0)
 
+// Usage: ./contain.out -i -n -p -c -U -m /tmp/images/ -u misachi /bin/ash
 
 void wait_parent(int wstatus, pid_t child_pid) {
     pid_t w;
@@ -26,10 +30,7 @@ void wait_parent(int wstatus, pid_t child_pid) {
     }
 }
 
-// mounts
-static void mount2();
-
-// pivot root
+// Cgroups
 
 // network
 
@@ -40,9 +41,15 @@ static void mount2();
 // apparmor
 
 static int child_fn(void *args) {
-    char ch;
     struct child_config *config = (struct child_config *) args;
-    // sethostname("misachid", 9);
+    sethostname(config->host_name, strlen(config->host_name));
+
+    if (fs_mount((struct child_config *) args) == -1) {
+        fprintf(stderr, "Mount Error: %m\n");
+        exit(EXIT_FAILURE);
+    }
+
+    char ch;
     close(config->fd[1]);
 
     if (read(config->fd[0], &ch, 1) != 0) {
@@ -53,33 +60,71 @@ static int child_fn(void *args) {
     close(config->fd[0]);
 
     if (execvp(config->argv[0], config->argv))
-      fprintf(stderr, "==> execvp failed: %m\n");
-      return -1;
+      errExit("==> execvp Failed");
     return 0;
+}
+
+
+static void prepare_args(struct child_config* config, int argc, char *argv[]){
+    int opt;
+    int count = 1;
+    while ((opt = getopt(argc, argv, "inpcUm:u:")) != -1) {
+        switch(opt) {
+            case 'p':
+                config->ns_types |= CLONE_NEWPID;
+                break;
+            case 'i':
+                config->ns_types |= CLONE_NEWIPC;
+                break;
+            case 'u':
+                config->ns_types |= CLONE_NEWUTS;
+                if (!(optarg)) {
+                    errExit("No hostname provided");
+                }
+                config->host_name = optarg;
+                break;
+            case 'm':
+                config->ns_types |= CLONE_NEWNS;
+                if (!(optarg)) {
+                    errExit("No filepath mount");
+                }
+                config->mount_dir = optarg;
+                break;
+            case 'c':
+                config->ns_types |= CLONE_NEWCGROUP;
+                break;
+            case 'n':
+                config->ns_types |= CLONE_NEWNET;
+                break;
+            case 'U':
+                config->ns_types |= CLONE_NEWUSER;
+                break;
+            default:
+                exit(EXIT_FAILURE);
+        }
+        count++;
+    }
 }
 
 int main(int argc, char *argv[]){
     pid_t child_pid;
     struct child_config config = {
-        .argc = argc,
-        .argv = &argv[1]
+        .argc = argc - 1,
     };  // remove first argument(file to execute)
-
+    
     int wstatus;
-    int ns_types = CLONE_NEWUSER
-        | CLONE_NEWNS
-        | CLONE_NEWCGROUP
-        | CLONE_NEWUTS
-        | CLONE_NEWIPC
-        | CLONE_NEWNET
-        | CLONE_NEWPID;
-
+  
+    prepare_args(&config, argc, argv);
+    config.argv = &argv[optind];
+  
     if (pipe(config.fd) == -1)
         errExit("pipe");
-    if ((child_pid = clone(child_fn, child_stack+1048576, ns_types | SIGCHLD, &config)) == -1) {
+
+    if ((child_pid = clone(child_fn, child_stack+1048576, config.ns_types | SIGCHLD, &config)) == -1) {
       fprintf(stderr, "=> clone failed! %m\n");
       exit(EXIT_FAILURE);
     }
+ 
     printf("clone() = %ld\n", (long)child_pid);
 
     user_namespace(child_pid);

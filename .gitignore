@@ -56,3 +56,6 @@ initial.c
 
 # Visual Studio Code
 .vscode/
+
+# netbeans
+nbproject/

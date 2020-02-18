@@ -5,6 +5,9 @@
 #include <string.h>
 #include <errno.h>
 
+#include "util.h"
+
+
 void file_open(int *fd, char *f_name) {
     if ((*fd = open(f_name, O_RDWR)) == -1) {
         fprintf(stderr, "==> Read File error: %m\n");

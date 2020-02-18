@@ -7,8 +7,8 @@
 
 #ifndef UTIL_LINUX_NAMESPACE_H
 # define UTIL_LINUX_NAMESPACE_H
-
 # include <sched.h>
+#include <limits.h>
 
 # ifndef CLONE_NEWNS
 #  define CLONE_NEWNS 0x00020000
@@ -46,6 +46,11 @@ struct child_config
   int argc;
   char **argv;
   int fd[2];
+  char *mount_dir;
+  unsigned int ns_types;
+  char *host_name;
 };
+static void handle_map(char *f_name, char *mapping);
+void user_namespace(pid_t _pid);
 
 #endif	/* UTIL_LINUX_NAMESPACE_H */

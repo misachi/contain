@@ -66,9 +66,7 @@ fs_mount(struct child_config* config){
     if (chdir("/") == -1) {
         errExit("==> Unable to change directory");
     }
-//    umount2("/dev/pts", MNT_DETACH);
-//    umount2("/dev/shm", MNT_DETACH);
-    
+
     create_dir("/proc");
     mount("proc", "/proc", "proc", 0, NULL);
 }
